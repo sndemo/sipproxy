@@ -20,6 +20,7 @@ local_host = 'sipproxy'
 
 pwd = 'xxxxxx'
 
+loop = None
 
 async def get_address(user):
     redis = await aioredis.create_redis('redis://redis')
@@ -41,6 +42,20 @@ async def get_address(user):
 def header(user, host, port) :
    return aiosip.Contact.from_header('sip:{}@{}:{}'.format( user, host,  port))
 
+async def on_invite2(request, message):
+    print('Call ringing!')
+    dialog = await request.prepare(status_code=100)
+    await dialog.reply(message, status_code=180)
+
+    await asyncio.sleep(3)
+    await dialog.reply(message, status_code=200)
+    print('Call started!')
+
+    async for message in dialog:
+        await dialog.reply(message, 200)
+        if message.method == 'BYE':
+            break
+
 async def on_invite(request, message):
     dialog = await request.prepare(status_code=100)
     
@@ -51,23 +66,23 @@ async def on_invite(request, message):
     if not to_host :
        not_found_message = "User {} is not registered.".format(to_user)
        print(not_found_message)
-       #await dialog.reply(message, status_code= 404, status_message=not_found_message)
-       await dialog.reply(message, 404)
+       
+       await dialog.reply(message, status_code=404)
        async for message in dialog:
-                await dialog.reply(message, 404)
+           print('Client message method:', message.method )
+           await dialog.reply(message, status_code=200)
+           if message.method == 'BYE' or message.method == 'CANCEL' :
+              break
+
+       print('Exited dialog loop.')
        return
     
-    loop = asyncio.get_event_loop()
     sip = aiosip.Application(loop=loop)
 
     local_port = random.randint(6001, 6999)
     peer = await sip.connect((to_host, to_port), protocol=aiosip.TCP, local_addr=(local_host, local_port))
 
-    call = await peer.invite(
-               from_details= message.from_details,
-               to_details= message.to_details,
-               contact_details= message.contact_details,
-               password=pwd)
+    call = await peer.invite( from_details= message.from_details, to_details= message.to_details, contact_details= message.contact_details, password=pwd ) 
 
     async with call:
       async def reader():
@@ -78,29 +93,26 @@ async def on_invite(request, message):
       with contextlib.suppress(asyncio.TimeoutError):
          await asyncio.wait_for(reader(), timeout=10)
     
+    async for message in dialog:
+        await dialog.reply(message, 200)
+        if message.method == 'BYE':
+            break
+    
     await sip.close()
-    loop.close()
 
 async def on_register(request, message):
     dialog = await request.prepare(status_code=100)
     
-    loop = asyncio.get_event_loop()
     sip = aiosip.Application(loop=loop)
-
     local_port = random.randint(7001,7999)
     peer = await sip.connect((registrar_host, registrar_port), protocol=aiosip.TCP, local_addr=(local_host, local_port))
 
-    rdialog = await peer.register(
-               from_details=message.from_details,
-               to_details=message.to_details,
-               contact_details=message.contact_details,
-               password=pwd)
+    rdialog = await peer.register( from_details=message.from_details, to_details=message.to_details, contact_details=message.contact_details, password=pwd )
 
     print("Registrar response:", rdialog.status_code)
     await dialog.reply(message, status_code= rdialog.status_code)
     
     await sip.close()
-    loop.close()
 
 
 class Dialplan(aiosip.BaseDialplan):
