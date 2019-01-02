@@ -6,6 +6,7 @@ import aioredis
 import aiosip
 import json
 import random
+import os
 
 proxy_ip = '0.0.0.0'
 proxy_port = 6100
@@ -22,9 +23,9 @@ pwd = 'xxxxxx'
 
 loop = None
 
-redis_host = os.getenv('REDIS_HOST', 'redis');
+redis_host = os.getenv('REDIS_HOST', 'redis')
 redis_port = 6379
-redis_password = os.getenv("REDIS_PASSWORD", None);
+redis_password = os.getenv("REDIS_PASSWORD", None)
 
 async def get_address(user):
     redis = await aioredis.create_redis('redis://' + redis_host, password = redis_password )
