@@ -22,16 +22,9 @@ pwd = 'xxxxxx'
 
 loop = None
 
-redis_host = getenv('REDIS_HOST');
-if (!isset(redis_host) || redis_host === null) {
-    redis_hosto = 'redis';
-}
-
+redis_host = getenv('REDIS_HOST', 'redis');
 redis_port = 6379
-redis_password = getenv("REDIS_PASSWORD");
-if (!isset(redis_password) || redis_password === null) {
-    redis_hosto = None;
-}
+redis_password = getenv("REDIS_PASSWORD", None);
 
 async def get_address(user):
     redis = await aioredis.create_redis('redis://' + redis_host, password = redis_password )
